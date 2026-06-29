@@ -64,7 +64,8 @@ jobs:
             --min-instances=1 --max-instances=3 \
             --timeout=300 --no-cpu-boost \
             --service-account=${{ env.RUNTIME_SA }} \
-            --set-secrets="NEWSAPI_KEY=NEWSAPI_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --set-env-vars="GCLOUD_PROJECT=probt-cloud,GCLOUD_LOCATION=us-central1" \
+            --set-secrets="NEWSAPI_KEY=NEWSAPI_KEY:latest" \
             --no-traffic --tag=ci-${{ github.sha }} --quiet
 
           gcloud run services update-traffic probt-api \

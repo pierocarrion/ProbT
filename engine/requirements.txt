@@ -14,7 +14,7 @@ python-dotenv>=1.0.0
 
 # ─── Sentiment: Vertex AI Gemini via google-genai unified SDK ──────
 # Uses ADC on Cloud Run, or GEMINI_API_KEY for local dev
-google-genai>=0.3.0
+google-genai>=1.0.0
 
 # ─── FastAPI gateway ───────────────────────────────────────────────
 fastapi>=0.115.0

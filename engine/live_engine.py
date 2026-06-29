@@ -125,9 +125,8 @@ def compute_reading(symbol: str, timeframe: str) -> dict:
     else:
         nearest = {"kind": None, "price": None, "distance_pct": None, "at_zone": False}
 
-    # ─── 4. News overlay (gold-heavy; per-symbol query) ───────────
-    headlines = news_sentiment.fetch_headlines(query=symbol_news_query(symbol))
-    news = news_sentiment.score_sentiment(headlines)
+    # ─── 4. News overlay (gold-heavy; per-symbol query, cached 6h) ──
+    news = news_sentiment.get_news_sentiment(query=symbol_news_query(symbol))
 
     # ─── 5. Sizing: Half-Kelly, cap 2% ────────────────────────────
     p, b = proba, 2.0
