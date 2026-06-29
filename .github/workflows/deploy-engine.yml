@@ -1,0 +1,90 @@
+name: Deploy Engine (probt-api)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "engine/**"
+      - ".github/workflows/deploy-engine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-engine
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: us-central1
+  RUNTIME_SA: 354072478643-compute@developer.gserviceaccount.com
+
+jobs:
+  deploy:
+    name: Build & deploy probt-api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Artifact Registry auth
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Resolve image tag
+        id: tag
+        run: echo "image=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/probt/engine:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build engine image (Cloud Build)
+        run: gcloud builds submit . --tag=${{ steps.tag.outputs.image }} --project=${{ env.GCP_PROJECT_ID }} --quiet
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy probt-api \
+            --image=${{ steps.tag.outputs.image }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --port=8080 \
+            --allow-unauthenticated \
+            --memory=1Gi --cpu=1 \
+            --min-instances=1 --max-instances=3 \
+            --timeout=300 --no-cpu-boost \
+            --service-account=${{ env.RUNTIME_SA }} \
+            --set-secrets="NEWSAPI_KEY=NEWSAPI_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --no-traffic --tag=ci-${{ github.sha }} --quiet
+
+          gcloud run services update-traffic probt-api \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --to-tags=ci-${{ github.sha }}=100 --quiet
+
+      - name: Capture API URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe probt-api --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} --format="value(status.url)")
+          echo "api_url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployed API: $URL"
+
+      - name: Smoke test /api/health
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            CODE=$(curl -s -o /tmp/h.json -w "%{http_code}" ${{ steps.url.outputs.api_url }}/api/health || echo 000)
+            echo "attempt $i -> HTTP $CODE"
+            if [ "$CODE" = "200" ]; then cat /tmp/h.json; exit 0; fi
+            sleep 5
+          done
+          echo "Health check failed" && exit 1
