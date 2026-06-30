@@ -6,6 +6,13 @@ export const API_URL =
 export const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000/ws/stream";
 
+/**
+ * Cadence (ms) at which the engine pushes readings over the WebSocket and at
+ * which the dashboard recomputes the "next update" countdown. Keep this in
+ * sync with the `WS_PUSH_INTERVAL` constant on the engine side.
+ */
+export const LIVE_INTERVAL_MS = 10_000;
+
 // ─── Accent → Tailwind classes ────────────────────────────────────
 export const accentText: Record<Accent, string> = {
   green: "text-success",

@@ -17,8 +17,7 @@ import yfinance as yf
 import symbols
 from symbols import (
     normalize_symbol, normalize_timeframe,
-    symbol_tickers, symbol_has_macro, symbol_name,
-    tf_interval, tf_period, tf_resample,
+    symbol_tickers, symbol_has_macro, tf_interval, tf_period, tf_resample,
     pair_path, data_dir,
 )
 
@@ -162,7 +161,7 @@ def collect_legacy():
     _, hourly = _download_first(symbol_tickers("XAUUSD"), period="730d", interval="60m")
     hourly = hourly[["open", "high", "low", "close", "volume"]].dropna()
     hourly.to_csv(os.path.join(data_dir(), "gold_hourly.csv"))
-    print(f"[data_collector] legacy: macro_daily.csv + gold_hourly.csv written")
+    print("[data_collector] legacy: macro_daily.csv + gold_hourly.csv written")
     return meta
 
 

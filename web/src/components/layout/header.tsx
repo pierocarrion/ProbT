@@ -12,6 +12,7 @@ import {
   Wifi,
   Command,
   Zap,
+  Loader2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -29,14 +30,16 @@ export function Header({ onCommand }: { onCommand: () => void }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
-  const { symbol, timeframe, setSymbol, setTimeframe } = useAsset();
+  const { symbol, timeframe, setSymbol, setTimeframe, transitioning } = useAsset();
 
   useEffect(() => {
-    setMounted(true);
+    // Defer the mount flag so we don't setState synchronously inside the effect
+    // (the React Compiler flags that pattern as a cascading render).
+    const id = setTimeout(() => setMounted(true), 0);
     const tick = () => setTime(utcNow());
     tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    const tickId = setInterval(tick, 1000);
+    return () => { clearTimeout(id); clearInterval(tickId); };
   }, []);
 
   return (
@@ -104,8 +107,12 @@ export function Header({ onCommand }: { onCommand: () => void }) {
         {/* Market selector */}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="hidden md:flex gap-1.5 font-medium" />}>
-            {symbol}
-            <ChevronDown className="h-3.5 w-3.5" />
+            <span className={transitioning ? "text-muted-foreground" : ""}>{symbol}</span>
+            {transitioning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {AVAILABLE_SYMBOLS.map((m) => (
@@ -119,8 +126,12 @@ export function Header({ onCommand }: { onCommand: () => void }) {
         {/* Timeframe selector */}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="hidden md:flex gap-1.5 font-medium" />}>
-            {timeframe}
-            <ChevronDown className="h-3.5 w-3.5" />
+            <span className={transitioning ? "text-muted-foreground" : ""}>{timeframe}</span>
+            {transitioning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {AVAILABLE_TIMEFRAMES.map((t) => (

@@ -2,7 +2,8 @@
 
 REST endpoints accept `symbol` and `timeframe` query params and serve
 dashboard-ready data derived from the trained model bundle for that pair.
-WebSocket /ws/stream pushes the live reading every 30s for the requested pair.
+WebSocket /ws/stream pushes the live reading every WS_PUSH_INTERVAL seconds
+(default 10s) for the requested pair.
 
 Run:  uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 """
@@ -27,15 +28,14 @@ _ENGINE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ENGINE_ROOT not in sys.path:
     sys.path.insert(0, _ENGINE_ROOT)
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from symbols import (
-    normalize_symbol, normalize_timeframe, symbol_name,
-    DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, SYMBOLS, TIMEFRAMES,
+from symbols import (  # noqa: E402
+    normalize_symbol, normalize_timeframe, DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, SYMBOLS, TIMEFRAMES,
     available_pairs, pair_exists,
 )
-from . import services
+from . import services  # noqa: E402
 
 # ─── In-memory caches keyed by (symbol, timeframe) ────────────────
 _CACHE: dict = {
@@ -48,6 +48,12 @@ _CACHE: dict = {
 }
 _DERIVED: dict = {}  # (s, tf) -> {backtest, kpis, probability_dist, ...}
 _DERIVED_TTL = 600   # 10 min
+
+# Cadence (s) at which the WebSocket pushes a fresh reading to subscribed
+# clients. Keep in sync with `LIVE_INTERVAL_MS` on the web side.
+WS_PUSH_INTERVAL = 10
+# How often the background loop refreshes cached readings for visited pairs.
+READING_REFRESH_INTERVAL = 30
 
 
 def _key(symbol: str, timeframe: str) -> tuple[str, str]:
@@ -123,9 +129,9 @@ async def lifespan(app: FastAPI):
 
 
 async def _bg_loop():
-    """Refresh readings of recently-visited pairs every 60s; market every 5 min."""
+    """Refresh readings of recently-visited pairs every READING_REFRESH_INTERVAL seconds; market every 5 min."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(READING_REFRESH_INTERVAL)
         for k in list(_CACHE["visited"]):
             s, t = k
             await asyncio.to_thread(_refresh_reading, s, t)
@@ -267,7 +273,7 @@ def get_system():
     return services.system()
 
 
-# ─── WebSocket: push live reading every 30s ────────────────────────
+# ─── WebSocket: push live reading every WS_PUSH_INTERVAL seconds ────
 @app.websocket("/ws/stream")
 async def ws_stream(ws: WebSocket):
     await ws.accept()
@@ -287,7 +293,7 @@ async def ws_stream(ws: WebSocket):
                 await asyncio.to_thread(_refresh_reading, symbol, timeframe)
             payload = _CACHE["readings"].get(k) or {}
             await ws.send_text(json.dumps({"type": "reading", "data": payload}))
-            await asyncio.sleep(30)
+            await asyncio.sleep(WS_PUSH_INTERVAL)
     except WebSocketDisconnect:
         pass
     except Exception:

@@ -10,7 +10,11 @@ import { AssetProvider } from "@/hooks/use-asset-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // Defer to avoid setState synchronously inside the effect body.
+  useEffect(() => {
+    const id = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(id);
+  }, []);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>

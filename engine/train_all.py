@@ -30,7 +30,7 @@ import data_collector
 import feature_engineer
 import labeler
 import model_trainer
-from symbols import SYMBOLS, TIMEFRAMES, all_keys, normalize_symbol, pair_path, symbols_dir
+from symbols import all_keys, normalize_symbol, symbols_dir
 import os
 
 

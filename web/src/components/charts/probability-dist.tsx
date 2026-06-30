@@ -1,7 +1,6 @@
 "use client";
 import type { EChartsOption } from "echarts";
 
-import { useMemo } from "react";
 import { EChartsBase } from "./echarts-base";
 import { accentColor } from "@/lib/chart-colors";
 
@@ -15,31 +14,33 @@ interface ProbDistData {
 }
 
 export function ProbabilityDist({ data, height = 280 }: { data: ProbDistData; height?: number }) {
-  const option = useMemo<EChartsOption>(() => {
-    const green = accentColor("green");
-    const blue = accentColor("blue");
-    const amber = accentColor("amber");
+  const green = accentColor("green");
+  const blue = accentColor("blue");
+  const amber = accentColor("amber");
 
-    // Cumulative %
-    const total = data.counts.reduce((a, b) => a + b, 0);
-    let acc = 0;
-    const cumPct = data.counts.map((c) => {
-      acc += c;
-      return total > 0 ? (acc / total) * 100 : 0;
-    });
+  // Cumulative % computed via a pure scan (no external mutation).
+  const total = data.counts.reduce((a, b) => a + b, 0);
+  const cumPct = data.counts.reduce<number[]>(
+    (acc, c, i) => {
+      const prev = i === 0 ? 0 : acc[i - 1] + data.counts[i - 1];
+      acc.push(total > 0 ? (((prev + c) / total) * 100) : 0);
+      return acc;
+    },
+    [],
+  );
 
-    const binLabels = data.bins.slice(0, -1).map((b, i) =>
-      `${(b * 100).toFixed(0)}–${(data.bins[i + 1] * 100).toFixed(0)}%`,
-    );
+  const binLabels = data.bins.slice(0, -1).map((b, i) =>
+    `${(b * 100).toFixed(0)}–${(data.bins[i + 1] * 100).toFixed(0)}%`,
+  );
 
-    const percentileMarks = Object.entries(data.percentiles).map(([k, v]) => ({
-      name: k.toUpperCase(),
-      xAxis: `${(v * 100).toFixed(0)}%`,
-      label: { show: true, formatter: k.toUpperCase(), fontSize: 9, color: amber },
-      lineStyle: { color: amber, type: "dashed" as const, width: 1 },
-    }));
+  const percentileMarks = Object.entries(data.percentiles).map(([k, v]) => ({
+    name: k.toUpperCase(),
+    xAxis: `${(v * 100).toFixed(0)}%`,
+    label: { show: true, formatter: k.toUpperCase(), fontSize: 9, color: amber },
+    lineStyle: { color: amber, type: "dashed" as const, width: 1 },
+  }));
 
-    return {
+  const option: EChartsOption = {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "shadow" },
@@ -120,8 +121,7 @@ export function ProbabilityDist({ data, height = 280 }: { data: ProbDistData; he
           areaStyle: { color: `${blue}10` },
         },
       ],
-    }
-  }, [data]);
+    };
 
   return <EChartsBase option={option} height={height} />;
 }

@@ -24,6 +24,7 @@ import { ProbabilityDist } from "@/components/charts/probability-dist";
 import { HeatmapChart } from "@/components/charts/heatmap-chart";
 import { GaugeChart } from "@/components/charts/gauge-chart";
 import { AiStatusPanel } from "@/components/widgets/ai-status-panel";
+import { LiveTicker } from "@/components/widgets/live-ticker";
 import { LiveTradesTable } from "@/components/tables/live-trades-table";
 import { DynamicIcon } from "@/components/lib/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +48,11 @@ import { fmtSigned } from "@/lib/format";
 export default function DashboardPage() {
   return (
     <DashboardShell>
+      {/* ─── Live Price Ticker ──────────────────────────────── */}
+      <section id="section-live">
+        <LiveTicker />
+      </section>
+
       {/* ─── KPI Row ─────────────────────────────────────────── */}
       <section id="section-dashboard">
         <KpiRow />

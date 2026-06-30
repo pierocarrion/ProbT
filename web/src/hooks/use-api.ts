@@ -68,7 +68,7 @@ export const useReading = () => {
   return useQuery({
     queryKey: qk.reading(symbol, timeframe),
     queryFn: () => fetcher<Reading>(`/api/reading?${pairQuery(symbol, timeframe)}`),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 };
 
@@ -115,7 +115,7 @@ export const useModels = () => {
 };
 
 export const useMarket = () =>
-  useQuery({ queryKey: qk.market, queryFn: () => fetcher<MarketAsset[]>("/api/market"), refetchInterval: 60_000 });
+  useQuery({ queryKey: qk.market, queryFn: () => fetcher<MarketAsset[]>("/api/market"), refetchInterval: 30_000 });
 
 export const useHeatmap = () => {
   const { symbol, timeframe } = useAsset();

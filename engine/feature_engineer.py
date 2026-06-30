@@ -35,7 +35,7 @@ import smc
 import support_resistance
 from symbols import (
     normalize_symbol, normalize_timeframe, symbol_has_macro,
-    tf_horizon, pair_path, data_dir,
+    pair_path, data_dir,
 )
 
 _SMC_WINDOW = 150
@@ -89,7 +89,6 @@ def build_last_row_features(
     then return the last row as a Series. NaN if not enough bars.
     """
     timeframe = normalize_timeframe(timeframe)
-    tf_suffix = timeframe.lower()
     bars = _clean_index(bars)
     if len(bars) < 60:
         return None

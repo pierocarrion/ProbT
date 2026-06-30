@@ -14,6 +14,10 @@ interface AssetState {
   setSymbol: (s: Symbol) => void;
   setTimeframe: (t: Timeframe) => void;
   pairKey: string;
+  /** True while pair-dependent data is reloading after a user change. */
+  transitioning: boolean;
+  /** Mark the transition complete (called by the coordinator once data settles). */
+  clearTransition: () => void;
 }
 
 const DEFAULT_SYMBOL: Symbol = "XAUUSD";
@@ -45,6 +49,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   const [initial] = useState(loadInitial);
   const [symbol, setSymbolState] = useState<Symbol>(initial.symbol);
   const [timeframe, setTimeframeState] = useState<Timeframe>(initial.timeframe);
+  const [transitioning, setTransitioning] = useState(false);
 
   // Persist on change
   useEffect(() => {
@@ -55,13 +60,28 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     }
   }, [symbol, timeframe]);
 
-  const setSymbol = useCallback((s: Symbol) => setSymbolState(s), []);
-  const setTimeframe = useCallback((t: Timeframe) => setTimeframeState(t), []);
+  const setSymbol = useCallback((s: Symbol) => {
+    setSymbolState((prev) => {
+      if (prev !== s) setTransitioning(true);
+      return s;
+    });
+  }, []);
+
+  const setTimeframe = useCallback((t: Timeframe) => {
+    setTimeframeState((prev) => {
+      if (prev !== t) setTransitioning(true);
+      return t;
+    });
+  }, []);
+
+  const clearTransition = useCallback(() => setTransitioning(false), []);
 
   const pairKey = `${symbol}_${timeframe}`;
 
   return (
-    <AssetContext.Provider value={{ symbol, timeframe, setSymbol, setTimeframe, pairKey }}>
+    <AssetContext.Provider
+      value={{ symbol, timeframe, setSymbol, setTimeframe, pairKey, transitioning, clearTransition }}
+    >
       {children}
     </AssetContext.Provider>
   );

@@ -66,7 +66,7 @@ def main():
     for _, r in high_pairs.iterrows():
         print(f"  WARNING - correlacion alta: {r['a']} <-> {r['b']}: {r['corr']:.2f}")
 
-    print(f"[feature_diagnostics] saved correlation_matrix.png + vif_report.csv")
+    print("[feature_diagnostics] saved correlation_matrix.png + vif_report.csv")
 
 
 if __name__ == "__main__":

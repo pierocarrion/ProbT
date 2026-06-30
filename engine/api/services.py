@@ -33,7 +33,7 @@ _ENGINE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ENGINE_ROOT not in sys.path:
     sys.path.insert(0, _ENGINE_ROOT)
 
-from symbols import (
+from symbols import (  # noqa: E402
     normalize_symbol, normalize_timeframe, symbol_name,
     tf_horizon, pair_path, pair_exists, available_pairs,
 )
@@ -481,7 +481,6 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
 def features(symbol: str, timeframe: str) -> list[dict]:
     symbol = normalize_symbol(symbol)
     timeframe = normalize_timeframe(timeframe)
-    df = _load_matrix(symbol, timeframe)
     feats = _load_features(symbol, timeframe)
     bundle = _load_model(symbol, timeframe)
     coef = None
