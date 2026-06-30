@@ -17,6 +17,7 @@ import {
   DollarSign,
   Layers,
   Newspaper,
+  CandlestickChart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ const map: Record<string, LucideIcon> = {
   "dollar-sign": DollarSign,
   layers: Layers,
   newspaper: Newspaper,
+  "candlestick-chart": CandlestickChart,
 };
 
 export function DynamicIcon({

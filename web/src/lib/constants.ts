@@ -59,6 +59,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Trading",
     items: [
+      { id: "smc", label: "Smart Money Chart", icon: "candlestick-chart", badge: "SMC" },
       { id: "trades", label: "Live Trades", icon: "arrow-right-left" },
       { id: "market", label: "Market Overview", icon: "globe" },
       { id: "heatmap", label: "Heatmap", icon: "grid-3x3" },
@@ -75,7 +76,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "System",
     items: [
-      { id: "settings", label: "Settings", icon: "settings" },
+      { id: "settings", label: "Settings", icon: "settings", badge: "TZ" },
       { id: "logs", label: "Logs", icon: "scroll-text" },
     ],
   },

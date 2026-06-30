@@ -152,3 +152,103 @@ export interface HealthStatus {
   uptime_s: number;
   reading_ready: boolean;
 }
+
+// ─── Smart Money Concepts chart types ──────────────────────────────
+
+export interface Candle {
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
+
+export interface SwingPoint {
+  scope: "swing" | "internal";
+  x: number;
+  price: number;
+  label: string; // HH | HL | LH | LL
+  is_high: boolean;
+}
+
+export interface StructureBreak {
+  scope: "swing" | "internal";
+  bias: "bull" | "bear";
+  type: "BOS" | "CHoCH";
+  x1: number;
+  x2: number;
+  price: number;
+}
+
+export interface OrderBlock {
+  scope: "swing" | "internal";
+  bias: "bull" | "bear";
+  x: number;
+  top: number;
+  bottom: number;
+  mitigated: boolean;
+}
+
+export interface FairValueGap {
+  bias: "bull" | "bear";
+  x: number;
+  top: number;
+  bottom: number;
+}
+
+export interface EqualHL {
+  kind: "EQH" | "EQL";
+  x: number;
+  price: number;
+  prev_price: number;
+}
+
+export interface SmcZones {
+  top: number;
+  bottom: number;
+  equilibrium: number;
+  premium: [number, number];
+  discount: [number, number];
+}
+
+export interface SmcData {
+  swings: SwingPoint[];
+  structures: StructureBreak[];
+  order_blocks_swing: OrderBlock[];
+  order_blocks_internal: OrderBlock[];
+  fvgs: FairValueGap[];
+  eqhl: EqualHL[];
+  zones: SmcZones | null;
+  bias: "bull" | "bear" | "neutral";
+}
+
+export interface SupplyDemandZone {
+  kind: "supply" | "demand";
+  x1: number;
+  x2: number;
+  top: number;
+  bottom: number;
+  delta: number;
+  pct: number;
+}
+
+export interface SupplyDemandData {
+  supply: SupplyDemandZone[];
+  demand: SupplyDemandZone[];
+  total_supply: number;
+  total_demand: number;
+}
+
+export interface ChartResponse {
+  symbol: string;
+  symbol_name: string;
+  timeframe: string;
+  n: number;
+  swing_length: number;
+  internal_length: number;
+  candles: Candle[];
+  smc: SmcData | null;
+  supply_demand: SupplyDemandData | null;
+  error?: string;
+}

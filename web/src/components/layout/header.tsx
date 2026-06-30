@@ -23,24 +23,37 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { utcNow } from "@/lib/format";
+import { utcNow, nowInZone, zoneNameLabel, zoneOffsetLabel } from "@/lib/format";
 import { useAsset, AVAILABLE_SYMBOLS, AVAILABLE_TIMEFRAMES } from "@/hooks/use-asset-context";
+import { useSettings } from "@/hooks/use-settings";
 
 export function Header({ onCommand }: { onCommand: () => void }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
   const { symbol, timeframe, setSymbol, setTimeframe, transitioning } = useAsset();
+  const { settings, hydrated } = useSettings();
 
   useEffect(() => {
     // Defer the mount flag so we don't setState synchronously inside the effect
     // (the React Compiler flags that pattern as a cascading render).
     const id = setTimeout(() => setMounted(true), 0);
-    const tick = () => setTime(utcNow());
+    const tick = () =>
+      setTime(nowInZone({ timezone: settings.timezone, clockFormat: settings.clockFormat }));
     tick();
     const tickId = setInterval(tick, 1000);
     return () => { clearTimeout(id); clearInterval(tickId); };
-  }, []);
+  }, [settings.timezone, settings.clockFormat]);
+
+  // Avoid hydration mismatch: render the legacy UTC string on the server and
+  // first paint, then swap to the user's timezone once mounted.
+  const displayTime = mounted && hydrated ? time : utcNow();
+  const tzLabel =
+    hydrated && mounted
+      ? settings.clockLabel === "name"
+        ? zoneNameLabel(settings.timezone)
+        : zoneOffsetLabel(settings.timezone)
+      : "UTC";
 
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-border bg-card/80 backdrop-blur-xl">
@@ -82,10 +95,10 @@ export function Header({ onCommand }: { onCommand: () => void }) {
 
         <Separator orientation="vertical" className="hidden lg:block h-6" />
 
-        {/* UTC time */}
-        <div className="hidden lg:flex items-center gap-1.5 font-mono text-xs text-muted-foreground tabular-nums">
-          <span className="text-[10px] uppercase tracking-wider">UTC</span>
-          <span className="font-medium text-foreground">{time}</span>
+        {/* Local time */}
+        <div className="hidden lg:flex items-center gap-1.5 font-mono text-xs text-muted-foreground tabular-nums" title={settings.timezone}>
+          <span className="text-[10px] uppercase tracking-wider">{tzLabel}</span>
+          <span className="font-medium text-foreground">{displayTime}</span>
         </div>
 
         {/* Center: Search */}
@@ -162,7 +175,12 @@ export function Header({ onCommand }: { onCommand: () => void }) {
             </Button>
           )}
 
-          <Button variant="ghost" size="icon" className="h-9 w-9">
+          <Button variant="ghost" size="icon" className="h-9 w-9" title="Settings"
+            onClick={() => {
+              const el = document.getElementById("section-settings");
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
             <Settings className="h-4 w-4" />
           </Button>
 

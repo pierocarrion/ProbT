@@ -13,6 +13,7 @@ import {
   Cpu,
   Gauge,
   Target,
+  CandlestickChart,
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { SectionCard } from "@/components/layout/section-card";
@@ -20,11 +21,13 @@ import { KpiCard } from "@/components/cards/kpi-card";
 import { ModelCard } from "@/components/cards/model-card";
 import { MarketTile } from "@/components/cards/market-tile";
 import { CumulativeChart } from "@/components/charts/cumulative-chart";
+import { SmcChart } from "@/components/charts/smc-chart";
 import { ProbabilityDist } from "@/components/charts/probability-dist";
 import { HeatmapChart } from "@/components/charts/heatmap-chart";
 import { GaugeChart } from "@/components/charts/gauge-chart";
 import { AiStatusPanel } from "@/components/widgets/ai-status-panel";
 import { LiveTicker } from "@/components/widgets/live-ticker";
+import { SettingsPanel } from "@/components/widgets/settings-panel";
 import { LiveTradesTable } from "@/components/tables/live-trades-table";
 import { DynamicIcon } from "@/components/lib/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,8 +44,9 @@ import {
   useConfidence,
   useInsights,
   useFeatures,
+  useChart,
 } from "@/hooks/use-api";
-import { accentText } from "@/lib/constants";
+import { accentText, accentBg } from "@/lib/constants";
 import { fmtSigned } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -56,6 +60,11 @@ export default function DashboardPage() {
       {/* ─── KPI Row ─────────────────────────────────────────── */}
       <section id="section-dashboard">
         <KpiRow />
+      </section>
+
+      {/* ─── Smart Money Concepts Chart ─────────────────────── */}
+      <section id="section-smc">
+        <SmcChartSection />
       </section>
 
       {/* ─── Main Chart + AI Status ──────────────────────────── */}
@@ -103,6 +112,11 @@ export default function DashboardPage() {
       <section id="section-features">
         <FeatureSection />
       </section>
+
+      {/* ─── Settings ─────────────────────────────────────────── */}
+      <section id="section-settings">
+        <SettingsPanel />
+      </section>
     </DashboardShell>
   );
 }
@@ -122,6 +136,59 @@ function KpiRow() {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
       {kpis.map((k, i) => <KpiCard key={k.id} kpi={k} index={i} />)}
     </div>
+  );
+}
+
+// ─── Smart Money Concepts Chart ────────────────────────────────
+function shortVol(v: number) {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return `${v}`;
+}
+
+function SmcChartSection() {
+  const { data, isLoading } = useChart();
+  const smc = data?.smc;
+  const sd = data?.supply_demand;
+  const bias = smc?.bias ?? "neutral";
+  const biasAccent = bias === "bull" ? "green" : bias === "bear" ? "red" : "gray";
+  const biasLabel = bias === "bull" ? "Bullish" : bias === "bear" ? "Bearish" : "Neutral";
+
+  return (
+    <SectionCard
+      title="Smart Money Concepts"
+      description="Order Blocks · Break of Structure (BOS) / Change of Character (CHoCH) · Fair Value Gaps (FVG) · Supply & Demand"
+      icon={<CandlestickChart className="h-4 w-4 text-info" />}
+      action={
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          {smc && (
+            <Badge variant="secondary" className={`${accentBg[biasAccent]} ${accentText[biasAccent]}`}>
+              {biasLabel} bias
+            </Badge>
+          )}
+          {sd && sd.total_supply + sd.total_demand > 0 && (
+            <span className="hidden sm:inline text-muted-foreground">
+              Supply <span className="font-semibold text-warning">{shortVol(sd.total_supply)}</span>
+              <span className="mx-1">·</span>
+              Demand <span className="font-semibold text-info">{shortVol(sd.total_demand)}</span>
+            </span>
+          )}
+          {data && (
+            <span className="hidden md:inline text-muted-foreground">
+              swing {data.swing_length} · int {data.internal_length}
+            </span>
+          )}
+        </div>
+      }
+      bodyClassName="p-2 sm:p-3"
+    >
+      {isLoading || !data || !data.candles.length ? (
+        <Skeleton className="h-[560px] rounded-xl" />
+      ) : (
+        <SmcChart data={data} height={560} />
+      )}
+    </SectionCard>
   );
 }
 

@@ -4,13 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrades } from "@/hooks/use-api";
-import { fmtPrice, fmtSigned, fmtDate } from "@/lib/format";
+import { useSettings } from "@/hooks/use-settings";
+import { fmtPrice, fmtSigned, fmtDateInZone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function LiveTradesTable() {
   const { data: trades, isLoading } = useTrades(30);
+  const { settings } = useSettings();
+  const zone = { timezone: settings.timezone, clockFormat: settings.clockFormat };
 
   return (
     <Card className="overflow-hidden">
@@ -55,7 +58,9 @@ export function LiveTradesTable() {
                   key={i}
                   className="border-b border-border transition-colors hover:bg-muted/40"
                 >
-                  <td className="px-4 py-2.5 font-mono text-muted-foreground whitespace-nowrap">{fmtDate(t.time)}</td>
+                  <td className="px-4 py-2.5 font-mono text-muted-foreground whitespace-nowrap" title={`${settings.timezone}`}>
+                    {fmtDateInZone(t.time, zone)}
+                  </td>
                   <td className="px-4 py-2.5 font-medium">{t.asset}</td>
                   <td className="px-4 py-2.5">
                     <span className={cn("text-[10px] font-semibold", t.type === "LONG" ? "text-success" : "text-destructive")}>

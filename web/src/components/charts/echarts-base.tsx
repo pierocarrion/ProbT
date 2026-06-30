@@ -12,7 +12,7 @@ export interface EChartsBaseProps {
 }
 
 /** Detects dark mode by observing <html> class changes. */
-function useDarkMode(): boolean {
+export function useDarkMode(): boolean {
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const check = () => setDark(document.documentElement.classList.contains("dark"));

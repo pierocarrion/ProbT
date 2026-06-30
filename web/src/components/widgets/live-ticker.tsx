@@ -8,8 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLiveReading } from "@/hooks/use-websocket";
 import { useReading } from "@/hooks/use-api";
 import { useAsset } from "@/hooks/use-asset-context";
+import { useSettings } from "@/hooks/use-settings";
 import { LIVE_INTERVAL_MS } from "@/lib/constants";
 import { fmtPrice } from "@/lib/format";
+import { fmtClockInZone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const SYMBOL_NAMES: Record<string, string> = {
@@ -20,17 +22,16 @@ const SYMBOL_NAMES: Record<string, string> = {
   SPX500: "S&P 500",
 };
 
-function fmtClock(d: Date): string {
-  return d.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
+function fmtClock(d: Date, timezone?: string, clockFormat?: "24h" | "12h"): string {
+  return fmtClockInZone(d, {
+    timezone: timezone ?? "UTC",
+    clockFormat: clockFormat ?? "24h",
   });
 }
 
 export function LiveTicker() {
   const { symbol, timeframe } = useAsset();
+  const { settings } = useSettings();
   const { reading: wsReading, connected, lastReceivedAt } = useLiveReading();
   // REST fallback keeps the ticker populated before the socket delivers its
   // first frame (or when the WS is unreachable, e.g. local dev without engine).
@@ -166,7 +167,7 @@ export function LiveTicker() {
                 <RefreshCw className="h-3 w-3" />
                 <span>Last update</span>
                 <span className="font-mono font-medium tabular-nums text-foreground">
-                  {lastUpdateMs ? fmtClock(new Date(lastUpdateMs)) : "—"}
+                  {lastUpdateMs ? fmtClock(new Date(lastUpdateMs), settings.timezone, settings.clockFormat) : "—"}
                 </span>
               </div>
 
@@ -176,7 +177,7 @@ export function LiveTicker() {
                 <span>Next update</span>
                 <span className="font-mono font-medium tabular-nums text-foreground">
                   {lastReceivedAt != null || lastUpdateMs != null
-                    ? fmtClock(new Date(nextUpdateMs))
+                    ? fmtClock(new Date(nextUpdateMs), settings.timezone, settings.clockFormat)
                     : "—"}
                 </span>
               </div>

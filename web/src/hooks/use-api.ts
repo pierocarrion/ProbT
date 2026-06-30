@@ -13,6 +13,7 @@ import type {
   Insight,
   FeatureImportance,
   HealthStatus,
+  ChartResponse,
 } from "@/types";
 import { API_URL } from "@/lib/constants";
 import { useAsset } from "@/hooks/use-asset-context";
@@ -57,6 +58,7 @@ export const qk = {
   confidence: (s: string, t: string) => ["confidence", s, t] as const,
   insights: (s: string, t: string) => ["insights", s, t] as const,
   features: (s: string, t: string) => ["features", s, t] as const,
+  chart: (s: string, t: string) => ["chart", s, t] as const,
 };
 
 // ─── Hooks ────────────────────────────────────────────────────────
@@ -146,6 +148,15 @@ export const useFeatures = () => {
   return useQuery({
     queryKey: qk.features(symbol, timeframe),
     queryFn: () => fetcher<FeatureImportance[]>(`/api/features?${pairQuery(symbol, timeframe)}`),
+  });
+};
+
+export const useChart = () => {
+  const { symbol, timeframe } = useAsset();
+  return useQuery({
+    queryKey: qk.chart(symbol, timeframe),
+    queryFn: () => fetcher<ChartResponse>(`/api/chart?bars=400&${pairQuery(symbol, timeframe)}`),
+    staleTime: 60_000,
   });
 };
 

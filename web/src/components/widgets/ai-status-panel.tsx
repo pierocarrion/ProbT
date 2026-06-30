@@ -27,9 +27,9 @@ export function AiStatusPanel() {
     { icon: Brain, label: "AI Confidence", value: `${(prob * 100).toFixed(1)}%`, accent: prob > 0.6 ? "text-success" : "text-warning" },
     { icon: Shield, label: "Risk Level", value: prob > 0.6 ? "Moderate" : "Elevated", accent: "text-warning" },
     { icon: Percent, label: "Expected ROI", value: `${((prob * 2 - (1 - prob)) * 100).toFixed(1)}%`, accent: "text-info" },
-    { icon: Zap, label: "Sizing (Half-Kelly)", value: `${sizing.toFixed(2)}%`, accent: "text-success" },
-    { icon: Cpu, label: "Active Model", value: isML ? "LogReg-L1" : "Heuristic fallback", accent: isML ? "text-success" : "text-muted-foreground" },
-    { icon: Clock, label: "Horizon", value: `${horizon} bars`, accent: "text-muted-foreground" },
+    { icon: Zap, label: "Sizing (Half-Kelly, 2% cap)", value: `${sizing.toFixed(2)}%`, accent: "text-success" },
+    { icon: Cpu, label: "Active Model", value: isML ? "LogReg-L1 (Logistic Regression)" : "Heuristic fallback", accent: isML ? "text-success" : "text-muted-foreground" },
+    { icon: Clock, label: "Horizon (bars ahead)", value: `${horizon} bars`, accent: "text-muted-foreground" },
     { icon: Server, label: "Engine", value: health?.reading_ready ? "Ready" : "…", accent: "text-success" },
   ];
 
@@ -64,7 +64,7 @@ export function AiStatusPanel() {
         </div>
         <div className="rounded-xl bg-muted/50 p-3">
           <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Signal className="h-3 w-3" /> Tier A
+            <Signal className="h-3 w-3" /> Tier A · ML Signal
           </div>
           <div className="mt-1 text-xl font-bold tabular-nums text-success">
             {(prob * 100).toFixed(1)}%

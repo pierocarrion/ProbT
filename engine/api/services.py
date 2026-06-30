@@ -494,3 +494,101 @@ def features(symbol: str, timeframe: str) -> list[dict]:
     order = np.argsort(-np.abs(coef))
     return [{"feature": feats[i], "coefficient": round(float(coef[i]), 4),
              "abs": round(float(abs(coef[i])), 4)} for i in order]
+
+
+# ─── chart (Smart Money Concepts + Supply/Demand overlays) ──────────
+def _load_bars(symbol: str, timeframe: str) -> pd.DataFrame | None:
+    """Read bars.csv for a pair directly (no yfinance import). None if absent."""
+    path = pair_path(symbol, timeframe, "bars.csv")
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, parse_dates=True, index_col=0)
+    df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+    return df[["open", "high", "low", "close", "volume"]].dropna()
+
+
+def _remap_overlay(item: dict, offset: int, keys: tuple[str, ...]) -> bool:
+    """Subtract `offset` from each index key in-place; drop if fully before 0."""
+    earliest = min((item[k] for k in keys if k in item), default=0)
+    if earliest - offset < 0 and all(item.get(k, 0) - offset < 0 for k in keys):
+        # entirely before visible window
+        latest = max((item[k] for k in keys if k in item), default=0)
+        if latest - offset < 0:
+            return False
+    for k in keys:
+        if k in item:
+            item[k] = max(item[k] - offset, 0)
+    return True
+
+
+def chart(symbol: str, timeframe: str, bars: int = 400,
+          swing_length: int = 10, internal_length: int = 4) -> dict:
+    """Build the SMC + Supply/Demand chart dataset for the last `bars` candles.
+
+    Computes SMC on a wider context window (bars + 200) so structure/order
+    blocks detected just before the visible window still render; indices are
+    remapped to the returned candle array. No trained model required.
+    """
+    import smc_pro
+    import supply_demand
+
+    symbol = normalize_symbol(symbol)
+    timeframe = normalize_timeframe(timeframe)
+    full = _load_bars(symbol, timeframe)
+    if full is None or len(full) < 30:
+        return {
+            "symbol": symbol, "symbol_name": symbol_name(symbol),
+            "timeframe": timeframe, "candles": [], "smc": None,
+            "supply_demand": None, "error": "no bars data",
+        }
+
+    context = 200
+    context_n = min(len(full), bars + context)
+    win = full.tail(context_n)
+    visible_n = min(bars, len(win))
+    offset = len(win) - visible_n
+
+    smc = smc_pro.compute_smc(win, swing_length=swing_length,
+                              internal_length=internal_length)
+    sd = supply_demand.compute_supply_demand(win)
+
+    # remap SMC positional indices to the visible candle array
+    def _clip(items, keys):
+        out = []
+        for it in items:
+            it = dict(it)
+            if _remap_overlay(it, offset, keys):
+                out.append(it)
+        return out
+
+    smc["swings"] = _clip(smc["swings"], ("x",))
+    smc["structures"] = _clip(smc["structures"], ("x1", "x2"))
+    smc["order_blocks_swing"] = _clip(smc["order_blocks_swing"], ("x",))
+    smc["order_blocks_internal"] = _clip(smc["order_blocks_internal"], ("x",))
+    smc["fvgs"] = _clip(smc["fvgs"], ("x",))
+    smc["eqhl"] = _clip(smc["eqhl"], ("x",))
+    if smc.get("strong_weak"):
+        sw = dict(smc["strong_weak"])
+        sw["top_bar"] = max(sw.get("top_bar", 0) - offset, 0)
+        sw["bottom_bar"] = max(sw.get("bottom_bar", 0) - offset, 0)
+        smc["strong_weak"] = sw
+
+    # remap supply/demand indices
+    sd["supply"] = _clip(sd["supply"], ("x1", "x2"))
+    sd["demand"] = _clip(sd["demand"], ("x1", "x2"))
+
+    visible = win.tail(visible_n)
+    candles = [
+        {"t": idx.strftime("%Y-%m-%d %H:%M"),
+         "o": round(float(r.open), 4), "h": round(float(r.high), 4),
+         "l": round(float(r.low), 4), "c": round(float(r.close), 4),
+         "v": int(r.volume) if pd.notna(r.volume) else 0}
+        for idx, r in visible.iterrows()
+    ]
+
+    return {
+        "symbol": symbol, "symbol_name": symbol_name(symbol),
+        "timeframe": timeframe, "n": visible_n,
+        "swing_length": swing_length, "internal_length": internal_length,
+        "candles": candles, "smc": smc, "supply_demand": sd,
+    }

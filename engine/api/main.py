@@ -48,6 +48,8 @@ _CACHE: dict = {
 }
 _DERIVED: dict = {}  # (s, tf) -> {backtest, kpis, probability_dist, ...}
 _DERIVED_TTL = 600   # 10 min
+_CHART_CACHE: dict = {}  # (s, tf, bars) -> {data, ts}
+_CHART_TTL = 120          # 2 min
 
 # Cadence (s) at which the WebSocket pushes a fresh reading to subscribed
 # clients. Keep in sync with `LIVE_INTERVAL_MS` on the web side.
@@ -266,6 +268,21 @@ def get_insights(symbol: str | None = None, timeframe: str | None = None):
 def get_features(symbol: str | None = None, timeframe: str | None = None):
     s, t = _pair_params(symbol, timeframe)
     return _derived(s, t)["features"]
+
+
+@app.get("/api/chart")
+def get_chart(symbol: str | None = None, timeframe: str | None = None,
+              bars: int = 400, swing_length: int = 10, internal_length: int = 4):
+    """SMC + Supply/Demand candlestick overlays. No trained model required."""
+    s, t = _pair_params(symbol, timeframe)
+    k = (s, t, bars)
+    cached = _CHART_CACHE.get(k)
+    if cached and (time.time() - cached["ts"]) < _CHART_TTL:
+        return cached["data"]
+    data = services.chart(s, t, bars=bars, swing_length=swing_length,
+                          internal_length=internal_length)
+    _CHART_CACHE[k] = {"data": data, "ts": time.time()}
+    return data
 
 
 @app.get("/api/system")

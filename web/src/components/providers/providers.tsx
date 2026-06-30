@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { queryClient } from "@/hooks/use-api";
 import { AssetProvider } from "@/hooks/use-asset-context";
+import { SettingsProvider } from "@/hooks/use-settings";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -18,14 +19,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-      <AssetProvider>
+      <SettingsProvider>
+        <AssetProvider>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             {children}
             {mounted && <Toaster position="bottom-right" richColors closeButton />}
           </TooltipProvider>
         </QueryClientProvider>
-      </AssetProvider>
+        </AssetProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }
