@@ -50,7 +50,27 @@ jobs:
         run: echo "image=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/probt/engine:${{ github.sha }}" >> $GITHUB_OUTPUT
 
       - name: Build engine image (Cloud Build)
-        run: gcloud builds submit . --tag=${{ steps.tag.outputs.image }} --project=${{ env.GCP_PROJECT_ID }} --quiet
+        run: |
+          # Submit the build asynchronously and poll for completion. This avoids
+          # `gcloud builds submit` failing on build-log streaming, which requires
+          # project Viewer/Owner access that the WIF SA should not hold.
+          BUILD_ID=$(gcloud builds submit . \
+            --tag=${{ steps.tag.outputs.image }} \
+            --project=${{ env.GCP_PROJECT_ID }} --quiet --async --format="value(id)")
+          echo "Submitted build $BUILD_ID, polling..."
+          for i in $(seq 1 60); do
+            STATUS=$(gcloud builds describe "$BUILD_ID" --project=${{ env.GCP_PROJECT_ID }} --format="value(status)")
+            echo "poll $i -> $STATUS"
+            case "$STATUS" in
+              SUCCESS) echo "Build succeeded"; exit 0 ;;
+              FAILURE|CANCELLED|INTERNAL_ERROR|TIMEOUT|EXPIRED)
+                echo "Build failed ($STATUS). Tail of build log:"
+                gcloud builds log "$BUILD_ID" --project=${{ env.GCP_PROJECT_ID }} --last=100 || true
+                exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "Build timed out waiting for $BUILD_ID" && exit 1
 
       - name: Deploy to Cloud Run
         id: deploy
