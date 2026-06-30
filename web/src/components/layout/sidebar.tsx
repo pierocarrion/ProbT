@@ -6,6 +6,7 @@ import { PanelLeftClose, PanelLeftOpen, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { RMultiple } from "@/components/lib/r-multiple";
 import { NAV_SECTIONS } from "@/lib/constants";
 import { DynamicIcon } from "@/components/lib/icons";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,9 @@ export function Sidebar({
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold tabular-nums">+68.0 R</div>
+              <div className="text-xs font-semibold tabular-nums">
+                +68.0 <RMultiple />
+              </div>
               <div className="text-[10px] text-muted-foreground">Total Profit</div>
             </div>
           )}

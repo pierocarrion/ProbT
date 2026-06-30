@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTrades } from "@/hooks/use-api";
 import { useSettings } from "@/hooks/use-settings";
 import { fmtPrice, fmtSigned, fmtDateInZone } from "@/lib/format";
+import { RMultiple } from "@/components/lib/r-multiple";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ export function LiveTradesTable() {
               <th className="px-4 py-2 text-left font-medium">Type</th>
               <th className="px-4 py-2 text-right font-medium">Entry</th>
               <th className="px-4 py-2 text-right font-medium">Exit</th>
-              <th className="px-4 py-2 text-right font-medium">PnL</th>
+              <th className="px-4 py-2 text-right font-medium" title="Profit and loss in Risk multiples (1R = amount risked)">PnL (R)</th>
               <th className="px-4 py-2 text-center font-medium">Status</th>
               <th className="px-4 py-2 text-right font-medium">Conf.</th>
               <th className="px-4 py-2 text-right font-medium">Dur.</th>
@@ -70,7 +71,7 @@ export function LiveTradesTable() {
                   <td className="px-4 py-2.5 text-right tabular-nums">{fmtPrice(t.entry)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmtPrice(t.exit)}</td>
                   <td className={cn("px-4 py-2.5 text-right font-semibold tabular-nums", t.pnl > 0 ? "text-success" : "text-destructive")}>
-                    {fmtSigned(t.pnl)}R
+                    {fmtSigned(t.pnl)}<RMultiple />
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <Badge variant="secondary" className={cn("h-5 text-[10px]", t.status === "TP" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>

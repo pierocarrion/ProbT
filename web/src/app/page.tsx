@@ -30,6 +30,7 @@ import { LiveTicker } from "@/components/widgets/live-ticker";
 import { SettingsPanel } from "@/components/widgets/settings-panel";
 import { LiveTradesTable } from "@/components/tables/live-trades-table";
 import { DynamicIcon } from "@/components/lib/icons";
+import { RMultiple } from "@/components/lib/r-multiple";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -199,14 +200,15 @@ function MainChartSection() {
   return (
     <SectionCard
       title="Cumulative Performance"
-      description="Equity curve · probability overlay · 10-day prediction"
+      description="Equity curve in R (Risk multiples · 1R = amount risked per trade) · probability overlay · 10-day prediction"
       icon={<TrendingUp className="h-4 w-4 text-success" />}
       action={
         <div className="flex items-center gap-2 text-xs">
           {m && (
             <>
               <Badge variant="secondary" className="bg-success/15 text-success">
-                {fmtSigned(m.total_profit_R)}R
+                {fmtSigned(m.total_profit_R)}
+                <RMultiple className="text-[0.7em]" />
               </Badge>
               <span className="hidden sm:inline text-muted-foreground">
                 Sharpe <span className="font-semibold text-foreground">{m.sharpe}</span>

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Sparkline } from "@/components/charts/sparkline";
+import { RMultiple } from "@/components/lib/r-multiple";
 import type { Kpi } from "@/types";
 import { accentText, accentBgSoft } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,13 @@ export function KpiCard({ kpi, index = 0 }: { kpi: Kpi; index?: number }) {
               <span className="text-2xl font-bold tracking-tight tabular-nums truncate">
                 {typeof kpi.value === "number" ? kpi.value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : kpi.value}
               </span>
-              {kpi.unit && <span className="text-xs text-muted-foreground font-medium">{kpi.unit}</span>}
+              {kpi.unit && (
+                kpi.unit === "R" ? (
+                  <RMultiple />
+                ) : (
+                  <span className="text-xs text-muted-foreground font-medium">{kpi.unit}</span>
+                )
+              )}
             </div>
           </div>
           {kpi.sparkline.length > 0 && (
