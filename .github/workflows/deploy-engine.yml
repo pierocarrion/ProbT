@@ -75,6 +75,9 @@ jobs:
       - name: Deploy to Cloud Run
         id: deploy
         run: |
+          # Cloud Run caps combined service-name + traffic-tag at 46 chars, so
+          # use the short SHA instead of the full github.sha.
+          TAG="ci-$(echo "${{ github.sha }}" | cut -c1-7)"
           gcloud run deploy probt-api \
             --image=${{ steps.tag.outputs.image }} \
             --region=${{ env.GCP_REGION }} \
@@ -87,12 +90,12 @@ jobs:
             --service-account=${{ env.RUNTIME_SA }} \
             --set-env-vars="GCLOUD_PROJECT=probt-cloud,GCLOUD_LOCATION=us-central1" \
             --set-secrets="NEWSAPI_KEY=NEWSAPI_KEY:latest" \
-            --no-traffic --tag=ci-${{ github.sha }} --quiet
+            --no-traffic --tag="$TAG" --quiet
 
           gcloud run services update-traffic probt-api \
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --to-tags=ci-${{ github.sha }}=100 --quiet
+            --to-tags="$TAG=100" --quiet
 
       - name: Capture API URL
         id: url
