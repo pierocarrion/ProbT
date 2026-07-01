@@ -882,7 +882,18 @@ export function SupplyDemandWidget({
           className={`font-bold tabular-nums ${net >= 0 ? "text-success" : "text-destructive"}`}
         >
           {net >= 0 ? "+" : ""}
-          {shortVol(net)} · {barBias}
+          {shortVol(net)} ·{" "}
+          <span
+            className={
+              bias === "bull"
+                ? "text-success"
+                : bias === "bear"
+                  ? "text-destructive"
+                  : "text-foreground"
+            }
+          >
+            {barBias}
+          </span>
         </span>
       </div>
     </div>
