@@ -2,46 +2,51 @@
   {
     "name": "XGBoost",
     "type": "XGBClassifier",
-    "accuracy": 0.3207,
-    "confidence": 0.8101,
+    "roc_auc": 0.5598,
+    "confidence": 0.811,
     "status": "benchmark",
-    "brier": 0.1899,
-    "train_time": 0.07
+    "brier": 0.189,
+    "calibrated": true,
+    "train_time": 0.26
   },
   {
     "name": "RandomForest",
     "type": "RandomForestClassifier",
-    "accuracy": 0.0625,
-    "confidence": 0.8134,
+    "roc_auc": 0.5639,
+    "confidence": 0.8109,
     "status": "benchmark",
-    "brier": 0.1866,
-    "train_time": 0.85
+    "brier": 0.1891,
+    "calibrated": true,
+    "train_time": 2.54
   },
   {
     "name": "GradientBoost",
     "type": "GradientBoostingClassifier",
-    "accuracy": 0.2699,
-    "confidence": 0.807,
+    "roc_auc": 0.5595,
+    "confidence": 0.812,
     "status": "benchmark",
-    "brier": 0.193,
-    "train_time": 2.08
+    "brier": 0.188,
+    "calibrated": true,
+    "train_time": 7.67
   },
   {
     "name": "AdaBoost",
     "type": "AdaBoostClassifier",
-    "accuracy": 0.0,
-    "confidence": 0.8152,
+    "roc_auc": 0.5643,
+    "confidence": 0.8113,
     "status": "benchmark",
-    "brier": 0.1848,
-    "train_time": 0.47
+    "brier": 0.1887,
+    "calibrated": true,
+    "train_time": 1.86
   },
   {
     "name": "Bayesian",
     "type": "GaussianNB",
-    "accuracy": 0.2889,
-    "confidence": 0.7961,
+    "roc_auc": 0.5766,
+    "confidence": 0.8122,
     "status": "benchmark",
-    "brier": 0.2039,
-    "train_time": 0.0
+    "brier": 0.1878,
+    "calibrated": true,
+    "train_time": 0.02
   }
 ]

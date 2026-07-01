@@ -16,6 +16,8 @@ const statusConfig = {
 export function ModelCard({ model, index = 0 }: { model: ModelCardType; index?: number }) {
   const status = statusConfig[model.status];
   const accent = model.status === "active" ? "green" : model.status === "benchmark" ? "blue" : "gray";
+  const rocAuc = model.roc_auc ?? null;
+  const bss = model.brier_skill_score ?? null;
 
   return (
     <motion.div
@@ -31,19 +33,28 @@ export function ModelCard({ model, index = 0 }: { model: ModelCardType; index?: 
               <Badge variant="secondary" className={cn("h-5 text-[10px]", status.className)}>
                 {status.label}
               </Badge>
+              {model.calibrated && (
+                <Badge variant="outline" className="h-5 text-[10px] text-muted-foreground">
+                  calibrated
+                </Badge>
+              )}
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{model.type}</p>
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Accuracy</div>
+          <div
+            title="ROC-AUC is threshold-free: 0.5 = random, >0.55 = useful signal, >0.60 = clear edge."
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">ROC-AUC</div>
             <div className="text-lg font-bold tabular-nums">
-              {model.accuracy > 0 ? `${(model.accuracy * 100).toFixed(1)}%` : "—"}
+              {rocAuc != null ? rocAuc.toFixed(3) : "—"}
             </div>
           </div>
-          <div>
+          <div
+            title="1 − Brier Score. Confidence in the probability estimate (higher is better)."
+          >
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</div>
             <div className="text-lg font-bold tabular-nums">
               {model.confidence > 0 ? `${(model.confidence * 100).toFixed(0)}%` : "—"}
@@ -57,8 +68,14 @@ export function ModelCard({ model, index = 0 }: { model: ModelCardType; index?: 
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px] text-muted-foreground">
-          <span>Brier: {model.brier != null ? model.brier.toFixed(4) : "—"}</span>
+        <div
+          className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px] text-muted-foreground"
+          title="Brier Skill Score vs. climatology: BSS > +0.10 = real edge, +0.28 = institutional. Below 0 = no better than always predicting the base rate."
+        >
+          <span>
+            Brier: {model.brier != null ? model.brier.toFixed(4) : "—"}
+            {bss != null && <span className="ml-2">BSS: {bss >= 0 ? "+" : ""}{bss.toFixed(3)}</span>}
+          </span>
           <span>Train: {model.train_time}</span>
         </div>
       </Card>

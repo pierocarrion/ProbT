@@ -42,6 +42,38 @@ _SMC_WINDOW = 150
 
 
 # ─── helpers ───────────────────────────────────────────────────────
+def _shannon_entropy(close: pd.Series, window: int = 20, n_bins: int = 10) -> pd.Series:
+    """Rolling Shannon entropy of the return distribution, normalized to [0, 1].
+
+    H_norm = 0 -> perfect order (predictable). H_norm -> 1 -> pure noise.
+    Computed on log-returns with a `window`-bar trailing window and `n_bins`
+    histogram bins. Normalized by log2(n_bins) so the output is comparable
+    across configurations. Vectorized via a sliding-window histogram.
+    """
+    log_returns = np.log(close / close.shift(1))
+    vals = log_returns.to_numpy(dtype=float)
+    n = len(vals)
+    out = np.full(n, np.nan)
+    if n <= window:
+        return pd.Series(out, index=close.index)
+    # Fixed bin edges over the full series so windows are comparable.
+    finite = vals[np.isfinite(vals)]
+    lo, hi = (finite.min(), finite.max()) if finite.size else (0.0, 1.0)
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+        return pd.Series(out, index=close.index)
+    edges = np.linspace(lo, hi, n_bins + 1)
+    h_max = np.log2(n_bins)
+    for i in range(window, n):
+        w = vals[i - window:i]
+        if np.isnan(w).any():
+            continue
+        counts, _ = np.histogram(w, bins=edges)
+        p = counts / counts.sum()
+        p = p[p > 0]
+        out[i] = -np.sum(p * np.log2(p)) / h_max
+    return pd.Series(out, index=close.index)
+
+
 def _clean_index(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -131,6 +163,10 @@ def build_features(
     log_c = np.log(close)
     out["ret_1"] = log_c.diff(1)
     out["ret_5"] = log_c.diff(5)
+
+    # Shannon entropy regime filter (normalized to [0, 1]).
+    # < 0.6 -> structured market, model may have edge; > 0.8 -> noise, down-weight.
+    out["entropy_20"] = _shannon_entropy(close, window=20, n_bins=10)
 
     # ─── 2. SMC bias + S/R zones (trailing window per bar) ────────
     smc_bias, zone_dist, at_zone = [], [], []

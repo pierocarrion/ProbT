@@ -13,6 +13,7 @@ __main__ prints a formatted terminal report.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -111,6 +112,26 @@ def compute_reading(symbol: str, timeframe: str) -> dict:
         proba = _heuristic_proba(last_row, timeframe)
         is_probability = False
 
+    # ─── 2b. Conformal prediction interval (90% coverage) ──────────
+    # Loads the half-width q_hat saved by model_trainer._fit_conformal. If the
+    # file is missing (old model / failed fit), fall back to a symmetric +/-8%.
+    proba_lo = proba
+    proba_hi = proba
+    conformal_path = pair_path(symbol, timeframe, "conformal.pkl")
+    if is_probability and os.path.exists(conformal_path):
+        try:
+            conf = joblib.load(conformal_path)
+            q = float(conf.get("q_hat", 0.08))
+            proba_lo = max(proba - q, 0.0)
+            proba_hi = min(proba + q, 1.0)
+        except Exception:
+            proba_lo = max(proba - 0.08, 0.0)
+            proba_hi = min(proba + 0.08, 1.0)
+    elif is_probability:
+        proba_lo = max(proba - 0.08, 0.0)
+        proba_hi = min(proba + 0.08, 1.0)
+    ev_positive = proba_lo > (1.0 / 3.0)  # even the lower bound beats 2:1 TP/SL breakeven
+
     # ─── 3. Tier B: SMC + nearest S/R zone (last 100 bars) ────────
     last100 = bars.tail(100)
     bias_b = smc.detect_structure(last100)
@@ -148,6 +169,9 @@ def compute_reading(symbol: str, timeframe: str) -> dict:
         "horizon_bars": horizon,
         "tier_a": {
             "probability": round(proba, 4),
+            "probability_lo": round(proba_lo, 4),
+            "probability_hi": round(proba_hi, 4),
+            "ev_positive": bool(ev_positive),
             "horizon_bars": horizon,
             "tp_sl_ratio": "2:1",
             "is_probability": is_probability,
@@ -175,7 +199,10 @@ def _print_report(r: dict):
     proba_tag = "(calibrated ML)" if r["tier_a"]["is_probability"] else "(heuristic fallback)"
     print(f"\nTIER A  -  {proba_tag}")
     print(f"  Probabilidad alcista ({r['horizon_bars']} barras): {p:.1%}")
-    print(f"  Direccion: {r['tier_a']['direction']}")
+    ta = r["tier_a"]
+    print(f"  Intervalo conformal 90%: [{ta['probability_lo']:.1%}, {ta['probability_hi']:.1%}]"
+          f"  EV+ (lo>1/3): {'SI' if ta['ev_positive'] else 'NO'}")
+    print(f"  Direccion: {ta['direction']}")
     print("\nTIER B  -  Heuristica SMC (no probabilistica)")
     print(f"  Bias: {r['tier_b']['bias'].upper()}")
     if nz["price"]:

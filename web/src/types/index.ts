@@ -2,6 +2,9 @@
 
 export interface TierA {
   probability: number;
+  probability_lo?: number;
+  probability_hi?: number;
+  ev_positive?: boolean;
   horizon_bars: number;
   tp_sl_ratio: string;
   is_probability: boolean;
@@ -104,6 +107,9 @@ export interface ModelCard {
   name: string;
   type: string;
   accuracy: number;
+  roc_auc?: number;
+  brier_skill_score?: number;
+  calibrated?: boolean;
   confidence: number;
   status: "active" | "benchmark" | "queued";
   updated: string;

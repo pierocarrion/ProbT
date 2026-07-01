@@ -5,7 +5,11 @@
   "atr_pct_1h",
   "ret_1",
   "ret_5",
+  "entropy_20",
   "smc_bias_1h",
   "zone_dist_atr",
-  "at_zone"
+  "at_zone",
+  "dxy_return_1d",
+  "vix_level",
+  "tnx_level"
 ]

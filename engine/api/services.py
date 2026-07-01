@@ -291,6 +291,10 @@ def models(symbol: str, timeframe: str) -> list[dict]:
     cards = [
         {"name": "LogReg-L1", "type": "Logistic Regression L1",
          "accuracy": round(m["win_rate"], 3),
+         "roc_auc": metrics.get("roc_auc", 0.5),
+         "brier_skill_score": metrics.get("brier_skill_score",
+                                          metrics.get("cv_brier_skill_score", 0.0)),
+         "calibrated": True,
          "confidence": round(max(1 - m["brier_score"], 0), 3),
          "status": "active", "brier": m["brier_score"],
          "train_time": metrics.get("train_time_s", 0.3),
@@ -300,11 +304,14 @@ def models(symbol: str, timeframe: str) -> list[dict]:
     for b in _load_benchmarks(symbol, timeframe):
         cards.append({
             "name": b["name"], "type": b["type"],
-            "accuracy": b["accuracy"], "confidence": b["confidence"],
+            "accuracy": b.get("accuracy", 0.0),
+            "roc_auc": b.get("roc_auc", 0.5),
+            "calibrated": b.get("calibrated", False),
+            "confidence": b["confidence"],
             "status": "benchmark", "brier": b["brier"],
             "train_time": f"{b['train_time']}s",
             "updated": metrics.get("trained_at", ""),
-            "performance": [v * (1 + (b["accuracy"] - 0.5) * 0.1) for v in perf[-20:]],
+            "performance": [v * (1 + (b.get("accuracy", 0.5) - 0.5) * 0.1) for v in perf[-20:]],
         })
     return cards
 
@@ -438,8 +445,39 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
     atr = _v(f"atr_pct_{tf}")
     smc_bias = int(_v(f"smc_bias_{tf}"))
     at_zone = int(_v("at_zone"))
+    entropy = _v("entropy_20")
     direction = "LONG" if last_proba >= 0.5 else "SHORT"
     accent_dir = "green" if last_proba >= 0.5 else "red"
+
+    # ─── Model skill (honest read of BSS / ROC-AUC vs. thresholds) ──
+    metrics = _load_metrics(symbol, timeframe)
+    bss = float(metrics.get("brier_skill_score",
+                            metrics.get("cv_brier_skill_score", 0.0)) or 0.0)
+    roc_auc = float(metrics.get("roc_auc", 0.5) or 0.5)
+    if bss >= 0.10:
+        skill_text = f"BSS {bss:+.3f} (>= +0.10 threshold) — real statistical edge vs. climatology."
+        skill_accent = "green"
+    elif bss >= 0.0:
+        skill_text = (f"BSS {bss:+.3f} — marginally above climatology but below the +0.10 "
+                      f"'real edge' threshold. Treat signals as weak.")
+        skill_accent = "amber"
+    else:
+        skill_text = (f"BSS {bss:+.3f} — NO skill over the base-rate forecast. "
+                      f"Do not trust directional signals from this model.")
+        skill_accent = "red"
+    auc_tag = ("useful" if roc_auc >= 0.55 else "clear edge" if roc_auc >= 0.60 else "near-random")
+
+    # ─── Regime (entropy self-filter) ──────────────────────────────
+    if entropy > 0.8:
+        regime_text = (f"Entropy {entropy:.2f} (>0.80) — high-noise regime. The model has little "
+                       f"edge here; halve position size or stand aside.")
+        regime_accent = "red"
+    elif entropy < 0.6:
+        regime_text = f"Entropy {entropy:.2f} (<0.60) — structured market, model edge may apply."
+        regime_accent = "green"
+    else:
+        regime_text = f"Entropy {entropy:.2f} — mixed regime, standard sizing."
+        regime_accent = "amber"
 
     cards = [
         {"title": "Decision Driver", "icon": "brain",
@@ -447,6 +485,14 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
                  f"on {symbol} {timeframe}. Primary driver: ATR% at {atr:.2f}% and "
                  f"RSI({tf}) at {rsi:.2f}.",
          "accent": accent_dir, "weight": round(last_proba, 3)},
+        {"title": "Model Skill", "icon": "target",
+         "text": f"{skill_text} ROC-AUC {roc_auc:.3f} ({auc_tag}). "
+                 f"Probability quality is what matters — a well-calibrated but weak model "
+                 f"is still safe to size from via Kelly.",
+         "accent": skill_accent, "weight": 0.85},
+        {"title": "Market Regime", "icon": "waves",
+         "text": regime_text,
+         "accent": regime_accent, "weight": 0.72},
         {"title": "Volatility", "icon": "activity",
          "text": f"ATR is {atr:.2f}% of price on {timeframe}. "
                  f"{'Elevated — wider stops recommended.' if atr > 1.5 else 'Normal range.'}",
@@ -471,7 +517,7 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
          "accent": "blue", "weight": 0.60},
         {"title": "Horizon", "icon": "clock",
          "text": f"Triple-Barrier label with TP=2·ATR, SL=1·ATR, horizon={tf_horizon(timeframe)} bars. "
-                 f"Brier Score CV: {_load_metrics(symbol, timeframe).get('cv_brier_score', 'n/a')}.",
+                 f"Brier Score CV: {metrics.get('cv_brier_score', 'n/a')}.",
          "accent": "gray", "weight": 0.40},
     ]
     return cards
