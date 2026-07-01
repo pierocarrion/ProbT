@@ -62,3 +62,5 @@ desktop.ini
 service-account.json
 gcloud-service-account.json
 *.creds
+
+data/*

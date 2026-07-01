@@ -11,7 +11,6 @@ import {
   ChevronDown,
   Wifi,
   Command,
-  Zap,
   Loader2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -64,15 +63,19 @@ export function Header({ onCommand }: { onCommand: () => void }) {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-success to-info shadow-sm"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-card shadow-sm ring-1 ring-border overflow-hidden"
           >
-            <Zap className="h-4 w-4 text-white" fill="white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/probt_logo.png"
+              alt="probt"
+              className="h-full w-full object-cover"
+              draggable={false}
+            />
           </motion.div>
-          <div className="hidden sm:block">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold tracking-tight">probt</span>
-              <span className="text-[10px] font-medium text-muted-foreground">AI</span>
-            </div>
+          <div className="hidden sm:flex items-center gap-1.5">
+            <span className="text-sm font-semibold tracking-tight">probt</span>
+            <span className="text-[10px] font-medium text-muted-foreground">AI</span>
           </div>
         </div>
 

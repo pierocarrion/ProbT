@@ -9,6 +9,10 @@ export interface EChartsBaseProps {
   height?: number | string;
   className?: string;
   loading?: boolean;
+  /** Receives the live ECharts instance (or null on unmount) for imperative use. */
+  onChartRef?: (chart: echarts.ECharts | null) => void;
+  /** Event bindings applied after init: [[eventName, handler], ...]. */
+  onEvents?: { event: string; handler: (params: unknown) => void }[];
 }
 
 /** Detects dark mode by observing <html> class changes. */
@@ -28,7 +32,7 @@ export function useDarkMode(): boolean {
  * Reusable ECharts wrapper — init, resize, theme, disposal.
  * Lazy-safe: renders nothing until mounted client-side.
  */
-export function EChartsBase({ option, height = 300, className, loading = false }: EChartsBaseProps) {
+export function EChartsBase({ option, height = 300, className, loading = false, onChartRef, onEvents }: EChartsBaseProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
   const isDark = useDarkMode();
@@ -56,14 +60,28 @@ export function EChartsBase({ option, height = 300, className, loading = false }
   useEffect(() => {
     const chart = ensureChart();
     if (!chart) return;
+    onChartRef?.(chart);
     const ro = new ResizeObserver(() => chart.resize());
     ro.observe(containerRef.current!);
     return () => {
       ro.disconnect();
       chart.dispose();
       chartRef.current = null;
+      onChartRef?.(null);
     };
-  }, [ensureChart, isDark]);
+  }, [ensureChart, isDark, onChartRef]);
+
+  // Bind event handlers
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !onEvents) return;
+    const cleanups: (() => void)[] = [];
+    for (const { event, handler } of onEvents) {
+      chart.on(event, handler);
+      cleanups.push(() => chart.off(event, handler));
+    }
+    return () => cleanups.forEach((c) => c());
+  }, [onEvents]);
 
   // Apply option + loading state
   useEffect(() => {

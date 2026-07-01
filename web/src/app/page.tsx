@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -21,7 +22,8 @@ import { KpiCard } from "@/components/cards/kpi-card";
 import { ModelCard } from "@/components/cards/model-card";
 import { MarketTile } from "@/components/cards/market-tile";
 import { CumulativeChart } from "@/components/charts/cumulative-chart";
-import { SmcChart } from "@/components/charts/smc-chart";
+import { SmcChart, SmcLayerToolbar, SupplyDemandWidget, DEFAULT_SMC_LAYERS } from "@/components/charts/smc-chart";
+import type { SmcLayers } from "@/components/charts/smc-chart";
 import { ProbabilityDist } from "@/components/charts/probability-dist";
 import { HeatmapChart } from "@/components/charts/heatmap-chart";
 import { GaugeChart } from "@/components/charts/gauge-chart";
@@ -141,15 +143,9 @@ function KpiRow() {
 }
 
 // ─── Smart Money Concepts Chart ────────────────────────────────
-function shortVol(v: number) {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
-  return `${v}`;
-}
-
 function SmcChartSection() {
   const { data, isLoading } = useChart();
+  const [layers, setLayers] = useState<SmcLayers>(DEFAULT_SMC_LAYERS);
   const smc = data?.smc;
   const sd = data?.supply_demand;
   const bias = smc?.bias ?? "neutral";
@@ -159,7 +155,7 @@ function SmcChartSection() {
   return (
     <SectionCard
       title="Smart Money Concepts"
-      description="Order Blocks · Break of Structure (BOS) / Change of Character (CHoCH) · Fair Value Gaps (FVG) · Supply & Demand"
+      description="Order Blocks · BOS / CHoCH · Fair Value Gaps · Supply & Demand · Live structure"
       icon={<CandlestickChart className="h-4 w-4 text-info" />}
       action={
         <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -168,13 +164,6 @@ function SmcChartSection() {
               {biasLabel} bias
             </Badge>
           )}
-          {sd && sd.total_supply + sd.total_demand > 0 && (
-            <span className="hidden sm:inline text-muted-foreground">
-              Supply <span className="font-semibold text-warning">{shortVol(sd.total_supply)}</span>
-              <span className="mx-1">·</span>
-              Demand <span className="font-semibold text-info">{shortVol(sd.total_demand)}</span>
-            </span>
-          )}
           {data && (
             <span className="hidden md:inline text-muted-foreground">
               swing {data.swing_length} · int {data.internal_length}
@@ -182,12 +171,18 @@ function SmcChartSection() {
           )}
         </div>
       }
-      bodyClassName="p-2 sm:p-3"
+      bodyClassName="p-2 sm:p-3 space-y-2"
     >
+      {/* Toolbar: per-indicator toggles + S/D sentiment widget */}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <SmcLayerToolbar layers={layers} onChange={setLayers} />
+        <SupplyDemandWidget sd={sd ?? null} bias={bias} />
+      </div>
+
       {isLoading || !data || !data.candles.length ? (
         <Skeleton className="h-[560px] rounded-xl" />
       ) : (
-        <SmcChart data={data} height={560} />
+        <SmcChart data={data} height={560} layers={layers} />
       )}
     </SectionCard>
   );

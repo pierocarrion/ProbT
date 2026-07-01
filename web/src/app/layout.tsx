@@ -16,9 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "probt — AI Quantitative Trading Intelligence",
+  title: "probt · AI Quantitative Trading Intelligence",
   description:
     "Professional XAUUSD probability engine dashboard with ML-calibrated regime prediction, smart money structure analysis, and real-time AI insights.",
+  icons: {
+    icon: [{ url: "/probt_logo.png", type: "image/png" }],
+    apple: [{ url: "/probt_logo.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

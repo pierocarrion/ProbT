@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PanelLeftClose, PanelLeftOpen, TrendingUp } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -89,8 +89,9 @@ export function Sidebar({
       {/* Footer: mini equity indicator */}
       <div className="border-t border-border p-3">
         <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
-            <TrendingUp className="h-4 w-4 text-success" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1 ring-border bg-card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/probt_logo.png" alt="probt" className="h-full w-full object-cover" />
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
