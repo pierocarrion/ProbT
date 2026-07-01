@@ -68,6 +68,13 @@ function hex(c: string, alpha: string) {
   return `${c}${alpha}`;
 }
 
+/** Primary x coordinate of an item, used to sort overlays left→right. */
+function itemX(it: Item): number {
+  if (it.kind === "rect") return it.x1;
+  if (it.kind === "line") return it.x1;
+  return it.x;
+}
+
 /** Build the full ECharts option for the SMC chart. */
 function buildOption(data: ChartResponse, isDark: boolean): EChartsOption {
   const candles = data.candles;
@@ -195,12 +202,22 @@ function buildOption(data: ChartResponse, isDark: boolean): EChartsOption {
   }
 
   // ─── renderItem for a group's items ────────────────────────────
-  function renderGroup(items: Item[]) {
+  // Items are sorted left→right so that text labels can be greedily
+  // thinned: once a label is painted at a given pixel, the next one is
+  // skipped unless there is enough horizontal gap. This keeps the chart
+  // readable when the user zooms out (many candles compressed together)
+  // or zooms in (wide bands) without overlapping annotations.
+  const TEXT_MIN_BAND = 7; // px width of a single candle band to allow any text
+  function renderGroup(rawItems: Item[]) {
+    const items = rawItems.slice().sort((a, b) => itemX(a) - itemX(b));
+    let lastLabelPx = -Infinity;
     return (
       params: CustomSeriesRenderItemParams,
       api: CustomSeriesRenderItemAPI,
     ): CustomSeriesRenderItemReturn => {
-      const it = items[params.dataIndex];
+      const idx = params.dataIndex;
+      if (idx === 0) lastLabelPx = -Infinity;
+      const it = items[idx];
       const cs = params.coordSys as unknown as {
         x: number; y: number; width: number; height: number;
       };
@@ -261,16 +278,22 @@ function buildOption(data: ChartResponse, isDark: boolean): EChartsOption {
           z2: 0,
         };
       }
-      // text
+      // text — greedily cull overlapping labels when the chart is compressed
+      const fs = it.fs ?? 10;
+      if (bandW < TEXT_MIN_BAND) return { type: "group", children: [] };
       const p = api.coord([it.x, it.y]);
+      const px = p[0];
+      const minGap = fs * 3.2; // approx label width + breathing room
+      if (Math.abs(px - lastLabelPx) < minGap) return { type: "group", children: [] };
+      lastLabelPx = px;
       return {
         type: "text",
         style: {
-          x: p[0] + (it.dx ?? 0),
+          x: px + (it.dx ?? 0),
           y: p[1] + (it.dy ?? 0),
           text: it.text,
           fill: it.color,
-          fontSize: it.fs ?? 10,
+          fontSize: fs,
           fontWeight: it.weight ?? 600,
           align: it.align ?? "center",
           verticalAlign: "middle",
@@ -321,11 +344,16 @@ function buildOption(data: ChartResponse, isDark: boolean): EChartsOption {
       },
     },
     legend: {
+      type: "scroll",
       data: legendNames,
       top: 4,
       textStyle: { fontSize: 10, color: labelColor },
       itemWidth: 12,
       itemHeight: 8,
+      pageIconColor: labelColor,
+      pageIconSize: 9,
+      pageTextStyle: { fontSize: 9, color: labelColor },
+      pageButtonItemGap: 2,
     },
     axisPointer: { link: [{ xAxisIndex: "all" }] },
     grid: { top: 36, bottom: 56, left: 12, right: 64, containLabel: true },
