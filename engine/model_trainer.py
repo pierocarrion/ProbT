@@ -75,6 +75,29 @@ def train(symbol: str, timeframe: str) -> dict | None:
               f"(< {tf_min_bars(timeframe)} min) — skip")
         return None
 
+    # ─── Rail 3: Regime Filter — train on actionable states only ────
+    # zone_dist_atr = distance to nearest S/R zone measured in ATR units.
+    # < 2.0  = price is within 2 ATR of a zone → actionable, include.
+    # >= 2.0 = price is floating in open space → noisy, exclude.
+    # Adjust ZONE_ATR_THRESHOLD to tune how strict the filter is:
+    #   1.0 = very strict (only bars touching the zone)
+    #   2.0 = moderate (recommended starting point)
+    #   3.0 = loose (keeps more rows but more noise)
+    ZONE_ATR_THRESHOLD = 2.0
+    if "zone_dist_atr" in df.columns:
+        n_before = len(df)
+        df = df[df["zone_dist_atr"] < ZONE_ATR_THRESHOLD].copy()
+        n_after = len(df)
+        pct = n_after / n_before * 100 if n_before > 0 else 0.0
+        print(f"[Rail 3] Regime filter: {n_before} rows → {n_after} rows "
+              f"({pct:.1f}% retained — near-zone training only)")
+        if n_after < 200:
+            print("[Rail 3] WARNING: fewer than 200 rows after filter — "
+                  "consider raising ZONE_ATR_THRESHOLD to 3.0")
+    else:
+        print("[Rail 3] zone_dist_atr column not found — filter skipped. "
+              "Re-run feature_engineer.py first.")
+
     X = df[feats].astype(float)
     y = df["label"].astype(int)
 

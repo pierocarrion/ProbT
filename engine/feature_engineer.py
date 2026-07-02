@@ -131,6 +131,143 @@ def build_last_row_features(
     return fm.iloc[-1]
 
 
+# ─── Fourier (FFT) cycle features ──────────────────────────────
+def _fourier_features(
+    close: pd.Series,
+    cycles: list = [8, 20, 29],
+    window: int = 128,
+) -> pd.DataFrame:
+    """Rolling FFT over `window` bars.
+
+    cycles = list of bar-length periods to analyse (unit = bars).
+    Returns:
+      fft_power_<c>  = normalised spectral power at cycle c
+      fft_phase_<c>  = instantaneous phase in [-pi, pi]
+    """
+    from scipy.fft import rfft, rfftfreq
+
+    prices = close.values.astype(float)
+    n = len(prices)
+    res = {f"fft_power_{c}": np.full(n, np.nan) for c in cycles}
+    res.update({f"fft_phase_{c}": np.full(n, np.nan) for c in cycles})
+
+    for i in range(window, n):
+        seg = prices[i - window:i].copy()
+        # Linear detrend — removes drift so FFT sees cycles, not trend
+        trend = np.linspace(seg[0], seg[-1], window)
+        seg_dt = seg - trend
+        F = rfft(seg_dt)
+        freqs = rfftfreq(window, d=1.0)  # cycles per bar
+        for c in cycles:
+            if c <= 0:
+                continue
+            idx = int(np.argmin(np.abs(freqs - 1.0 / c)))
+            res[f"fft_power_{c}"][i] = float(np.abs(F[idx]) ** 2)
+            res[f"fft_phase_{c}"][i] = float(np.angle(F[idx]))
+
+    df_out = pd.DataFrame(res, index=close.index)
+    # Normalise power by 50-bar rolling mean (removes scale dependency)
+    for c in cycles:
+        col = f"fft_power_{c}"
+        roll = df_out[col].rolling(50, min_periods=10).mean()
+        df_out[col] = df_out[col] / (roll + 1e-10)
+    return df_out
+
+
+# ─── Wavelet (CWT Morlet) features ─────────────────────────────
+def _wavelet_features(
+    close: pd.Series,
+    scales: list = [4, 8, 16, 32],
+) -> pd.DataFrame:
+    """CWT with Morlet wavelet over the full price series.
+
+    scales = list of bar-length scales (unit = bars).
+    Returns:
+      wavelet_energy_s<n>        = normalised energy at scale n
+      wavelet_phase_interference = (1 - cos(phase_fast - phase_slow)) / 2
+        0 = in-phase (strong signal)
+        1 = fully out-of-phase (noisy / reversal)
+    """
+    try:
+        import pywt
+    except ImportError:
+        print("[feature_engineer] pywt not installed — wavelet features skipped")
+        return pd.DataFrame(index=close.index)
+
+    prices = close.values.astype(float)
+    res = {}
+    # CWT — operates on the full series at once (vectorised, fast)
+    coeffs, _ = pywt.cwt(prices, scales, "morl")
+    for i, scale in enumerate(scales):
+        energy = np.abs(coeffs[i]) ** 2
+        energy_s = pd.Series(energy, index=close.index)
+        # Normalise: divide by 100-bar rolling mean
+        roll = energy_s.rolling(100, min_periods=20).mean()
+        res[f"wavelet_energy_s{scale}"] = energy_s / (roll + 1e-10)
+
+    # Phase interference: fastest scale vs third scale
+    if len(scales) >= 3:
+        phase_fast = np.angle(coeffs[0])  # e.g. scale=4 bars
+        phase_slow = np.angle(coeffs[2])  # e.g. scale=16 bars
+        diff = phase_fast - phase_slow
+        # 0 = in-phase (constructive — trend alignment across timeframes)
+        # 1 = anti-phase (destructive — conflicting signals, avoid trading)
+        res["wavelet_phase_interference"] = pd.Series(
+            (1.0 - np.cos(diff)) / 2.0,
+            index=close.index,
+        )
+    return pd.DataFrame(res, index=close.index)
+
+
+# ─── Clayton Copula residual (XAUUSD vs DXY) ──────────────────
+def _copula_residual(
+    y_returns: pd.Series,
+    x_returns: pd.Series,
+    window: int = 60,
+) -> pd.Series:
+    """Empirical Clayton-copula conditional residual.
+
+    y = XAUUSD log-returns, x = DXY log-returns.
+    For each bar i in range [window, n]:
+      1. Rank-transform the window → uniform margins [0,1]
+      2. Estimate theta from Kendall tau: theta = 2*tau / (1 - tau)
+      3. Compute E[U | V = v_curr] via nearest-neighbour in the rank space
+      4. Residual = u_curr - E[U|V]
+    Positive residual: gold outperforms what DXY predicts (bullish signal)
+    Negative residual: gold underperforms (bearish signal)
+    """
+    from scipy.stats import rankdata as _rank, kendalltau
+
+    y = y_returns.values.astype(float)
+    x = x_returns.values.astype(float)
+    n = len(y)
+    residuals = np.full(n, np.nan)
+
+    for i in range(window, n):
+        y_w = y[i - window:i]
+        x_w = x[i - window:i]
+        valid = np.isfinite(y_w) & np.isfinite(x_w)
+        if valid.sum() < window // 2:
+            continue
+        y_v, x_v = y_w[valid], x_w[valid]
+        m = len(y_v)
+        # Rank transform → uniform margins
+        uy = _rank(y_v) / (m + 1.0)
+        ux = _rank(x_v) / (m + 1.0)
+        # Rank of the most recent observation within the window
+        u_curr = float(np.sum(y_v[:-1] < y_v[-1]) / max(m - 1, 1))
+        v_curr = float(np.sum(x_v[:-1] < x_v[-1]) / max(m - 1, 1))
+        # Empirical conditional E[U | V near v_curr]
+        # bandwidth 0.20 = look at x-ranks within ±20% of v_curr
+        bw = 0.20
+        near_v = np.abs(ux - v_curr) < bw
+        if near_v.sum() >= 5:
+            u_expected = float(uy[near_v].mean())
+            residuals[i] = u_curr - u_expected
+
+    return pd.Series(residuals, index=y_returns.index)
+
+
 # ─── core ──────────────────────────────────────────────────────────
 def build_features(
     bars: pd.DataFrame,
@@ -170,12 +307,15 @@ def build_features(
 
     # ─── 2. SMC bias + S/R zones (trailing window per bar) ────────
     smc_bias, zone_dist, at_zone = [], [], []
+    at_demand, at_supply = [], []  # Rail 2: directional zone flags
     cols = ["open", "high", "low", "close"]
     for i in range(len(bars)):
         if i < 60:
             smc_bias.append(0)
             zone_dist.append(np.nan)
             at_zone.append(0)
+            at_demand.append(0)  # Rail 2
+            at_supply.append(0)  # Rail 2
             continue
         start = max(0, i - _SMC_WINDOW)
         window_df = bars.iloc[start:i + 1][cols]
@@ -184,6 +324,7 @@ def build_features(
         zones = support_resistance.detect_zones(window_df)
         price = float(close.iloc[i])
         atr_i = float(atr_abs.iloc[i]) if pd.notna(atr_abs.iloc[i]) else 0.0
+        # Nearest zone (direction-blind) — same as before
         nz = support_resistance.nearest_zone(price, zones)
         if nz and atr_i > 0:
             dist = abs(nz["price"] - price) / atr_i
@@ -192,13 +333,69 @@ def build_features(
         else:
             zone_dist.append(np.nan)
             at_zone.append(0)
+        # Rail 2: directional zone proximity ──────────────────────
+        if atr_i > 0:
+            nz_bull = support_resistance.nearest_zone(price, zones, kind="support")
+            nz_bear = support_resistance.nearest_zone(price, zones, kind="resistance")
+            d_bull = abs(nz_bull["price"] - price) / atr_i if nz_bull else np.inf
+            d_bear = abs(nz_bear["price"] - price) / atr_i if nz_bear else np.inf
+            at_demand.append(1 if d_bull < 0.5 else 0)
+            at_supply.append(1 if d_bear < 0.5 else 0)
+        else:
+            at_demand.append(0)
+            at_supply.append(0)
     out[f"smc_bias_{tf_suffix}"] = smc_bias
     out["zone_dist_atr"] = zone_dist
     out["at_zone"] = at_zone
+    out["at_demand"] = at_demand  # Rail 2: new
+    out["at_supply"] = at_supply  # Rail 2: new
+    # Rail 1: Interaction (cross) features ─────────────────────────
+    # Multiplying indicator × zone_flag forces the model to evaluate
+    # both simultaneously. L1 zeroes them if they add no information.
+    tf = tf_suffix
+    out["rsi_x_demand"] = out[f"rsi_{tf}"] * out["at_demand"]
+    out["rsi_x_supply"] = out[f"rsi_{tf}"] * out["at_supply"]
+    out["macd_x_demand"] = out[f"macd_pct_{tf}"] * out["at_demand"]
+    out["macd_x_supply"] = out[f"macd_pct_{tf}"] * out["at_supply"]
+    out["ema_x_demand"] = out[f"ema_cross_{tf}"] * out["at_demand"]
+    out["ema_x_supply"] = out[f"ema_cross_{tf}"] * out["at_supply"]
+    out["atr_x_zone"] = out[f"atr_pct_{tf}"] * out["at_zone"]
 
     # ─── 3. Macro (gold only) ─────────────────────────────────────
     if symbol is None or symbol_has_macro(symbol):
         out = _attach_macro(out, macro)
+
+    # ─── Fourier spectral features ─────────────────────────────────
+    # window=128 needs 128 bars of history; bars before that stay NaN
+    # (dropna() at the end of build_features handles this automatically)
+    fft_df = _fourier_features(close, cycles=[8, 20, 29], window=128)
+    for col in fft_df.columns:
+        out[col] = fft_df[col].reindex(out.index)
+
+    # ─── Wavelet spectral features ─────────────────────────────────
+    wvt_df = _wavelet_features(close, scales=[4, 8, 16, 32])
+    for col in wvt_df.columns:
+        out[col] = wvt_df[col].reindex(out.index)
+
+    # ─── Clayton copula residual (XAUUSD vs DXY) — gold pairs only ──
+    # DXY is daily-native: computing the copula directly on hourly bars
+    # degenerates because ffill makes ~23/24 hourly dxy returns zero,
+    # leaving too few distinct points per 60-bar window. Compute the
+    # copula at DAILY resolution (both series → end-of-day) then broadcast
+    # the residual back onto the bar index via ffill.
+    if symbol and symbol_has_macro(symbol) and macro is not None:
+        macro_c = _clean_index(macro.copy())
+        if "dxy" in macro_c.columns:
+            dxy_d = macro_c["dxy"].dropna()
+            dxy_ret_d = np.log(dxy_d / dxy_d.shift(1)).dropna()
+            close_d = close.groupby(close.index.normalize()).last().dropna()
+            xau_ret_d = np.log(close_d / close_d.shift(1)).dropna()
+            common = dxy_ret_d.index.intersection(xau_ret_d.index)
+            resid_d = _copula_residual(
+                xau_ret_d.reindex(common), dxy_ret_d.reindex(common), window=60
+            ).dropna()
+            resid_d.index = resid_d.index.normalize()
+            out["copula_residual_dxy"] = resid_d.reindex(out.index, method="ffill")
 
     # Keep OHLC for the labeler, then drop warmup NaNs from indicators
     out["high"] = bars["high"]
