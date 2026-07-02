@@ -236,7 +236,7 @@ def _copula_residual(
     Positive residual: gold outperforms what DXY predicts (bullish signal)
     Negative residual: gold underperforms (bearish signal)
     """
-    from scipy.stats import rankdata as _rank, kendalltau
+    from scipy.stats import rankdata as _rank
 
     y = y_returns.values.astype(float)
     x = x_returns.values.astype(float)
