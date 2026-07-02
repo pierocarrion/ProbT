@@ -12,15 +12,15 @@ export function AiStatusPanel() {
   const { data: reading } = useReading();
   const { data: health } = useHealth();
 
-  const prob = reading ? reading.tier_a.probability : 0;
-  const bias = reading?.tier_b.bias ?? "—";
+  const prob = reading?.tier_a?.probability ?? 0;
+  const bias = reading?.tier_b?.bias ?? "—";
   const price = reading?.price ?? 0;
-  const sizing = reading?.sizing.final_pct ?? 0;
+  const sizing = reading?.sizing?.final_pct ?? 0;
   const symbol = reading?.symbol ?? "XAUUSD";
   const timeframe = reading?.timeframe ?? "1D";
   const horizon = reading?.horizon_bars ?? 10;
-  const direction = reading?.tier_a.direction ?? (prob >= 0.5 ? "LONG" : "SHORT");
-  const isML = reading?.tier_a.is_probability ?? false;
+  const direction = reading?.tier_a?.direction ?? (prob >= 0.5 ? "LONG" : "SHORT");
+  const isML = reading?.tier_a?.is_probability ?? false;
 
   const rows = [
     { icon: Signal, label: "Current Signal", value: direction, accent: direction === "LONG" ? "text-success" : "text-destructive" },

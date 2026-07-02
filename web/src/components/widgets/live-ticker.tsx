@@ -39,8 +39,8 @@ export function LiveTicker() {
 
   const reading = wsReading ?? restReading ?? null;
   const price = reading?.price ?? 0;
-  const probability = reading?.tier_a.probability ?? 0;
-  const direction = reading?.tier_a.direction ?? (probability >= 0.5 ? "LONG" : "SHORT");
+  const probability = reading?.tier_a?.probability ?? 0;
+  const direction = reading?.tier_a?.direction ?? (probability >= 0.5 ? "LONG" : "SHORT");
   const isLong = direction === "LONG";
 
   // Server-side "last update" timestamp (when the engine generated the reading).

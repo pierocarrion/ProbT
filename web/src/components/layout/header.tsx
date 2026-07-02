@@ -22,7 +22,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { utcNow, nowInZone, zoneNameLabel, zoneOffsetLabel } from "@/lib/format";
+import { nowInZone, zoneNameLabel, zoneOffsetLabel } from "@/lib/format";
 import { useAsset, AVAILABLE_SYMBOLS, AVAILABLE_TIMEFRAMES } from "@/hooks/use-asset-context";
 import { useSettings } from "@/hooks/use-settings";
 
@@ -44,9 +44,10 @@ export function Header({ onCommand }: { onCommand: () => void }) {
     return () => { clearTimeout(id); clearInterval(tickId); };
   }, [settings.timezone, settings.clockFormat]);
 
-  // Avoid hydration mismatch: render the legacy UTC string on the server and
-  // first paint, then swap to the user's timezone once mounted.
-  const displayTime = mounted && hydrated ? time : utcNow();
+  // Avoid hydration mismatch: the server and client can't agree on a live
+  // clock value, so render an empty slot on the server and first paint, then
+  // fill in the user's timezone clock once mounted.
+  const displayTime = mounted && hydrated ? time : "";
   const tzLabel =
     hydrated && mounted
       ? settings.clockLabel === "name"
