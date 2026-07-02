@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { RMultiple } from "@/components/lib/r-multiple";
 import { NAV_SECTIONS } from "@/lib/constants";
 import { DynamicIcon } from "@/components/lib/icons";
+import { useKpis } from "@/hooks/use-api";
+import { fmtSigned } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
@@ -22,6 +24,9 @@ export function Sidebar({
   active: string;
   onSelect: (id: string) => void;
 }) {
+  const { data: kpis } = useKpis();
+  const totalProfit = kpis?.find((k) => k.id === "total_profit");
+  const profitVal = typeof totalProfit?.value === "number" ? totalProfit.value : null;
   return (
     <motion.aside
       animate={{ width: collapsed ? 64 : 240 }}
@@ -96,7 +101,7 @@ export function Sidebar({
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="text-xs font-semibold tabular-nums">
-                +68.0 <RMultiple />
+                {profitVal == null ? "—" : fmtSigned(profitVal, 1)} <RMultiple />
               </div>
               <div className="text-[10px] text-muted-foreground">Total Profit</div>
             </div>

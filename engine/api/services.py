@@ -118,13 +118,20 @@ def backtest(symbol: str, timeframe: str) -> dict:
     n = len(taken)
     win_rate = len(wins) / n if n else 0.0
 
-    rets = df["pnl_R"].diff().replace(0, np.nan).dropna()
-    if len(rets) > 10 and rets.std() > 0:
-        # bars-per-year scaling so Sharpe is comparable across timeframes
+    # Per-trade PnL returns — correct granularity for risk-adjusted metrics.
+    # The previous bar-diff approach mixed trade bars with no-trade bars and
+    # could collapse to std==0 (Sharpe=0) on sparse signals. Annualize via the
+    # realized trade frequency (trades/year derived from bars/year ÷ bars/trade).
+    trade_rets = taken["pnl_R"].astype(float)
+    if len(trade_rets) > 10 and trade_rets.std() > 0:
         bars_per_year = _bars_per_year(timeframe)
-        sharpe = float(rets.mean() / rets.std() * np.sqrt(bars_per_year))
-        downside = rets[rets < 0]
-        sortino = float(rets.mean() / downside.std() * np.sqrt(bars_per_year)) if len(downside) and downside.std() > 0 else 0.0
+        bars_per_trade = len(df) / n if n else 1.0
+        trades_per_year = bars_per_year / bars_per_trade if bars_per_trade > 0 else 1.0
+        ann = float(np.sqrt(trades_per_year))
+        sharpe = float(trade_rets.mean() / trade_rets.std() * ann)
+        downside = trade_rets[trade_rets < 0]
+        sortino = (float(trade_rets.mean() / downside.std() * ann)
+                   if len(downside) and downside.std() > 0 else 0.0)
     else:
         sharpe = sortino = 0.0
 
@@ -135,6 +142,12 @@ def backtest(symbol: str, timeframe: str) -> dict:
 
     brier = float(np.mean((df["proba"] - df["label"]) ** 2))
     brier_cv = _load_metrics(symbol, timeframe).get("cv_brier_score", round(brier, 4))
+
+    # Real "today" profit: sum of bar PnL whose date matches the last bar's
+    # date. Honest vs. the previous eq[-1]-eq[-2] which was just the last-bar
+    # delta (wrong on any timeframe with >1 bar/day, e.g. intraday).
+    last_date = df.index[-1].date()
+    today_profit_R = float(df.loc[df.index.date == last_date, "pnl_R"].sum()) if len(df) else 0.0
 
     return {
         "symbol": symbol,
@@ -148,6 +161,7 @@ def backtest(symbol: str, timeframe: str) -> dict:
             "win_rate": round(win_rate, 4),
             "total_profit_R": round(float(equity_curve[-1]), 2) if len(equity_curve) else 0,
             "total_profit_pct": round(float(df["equity_pct"].iloc[-1]), 2) if len(df) else 0,
+            "today_profit_R": round(today_profit_R, 2),
             "sharpe": round(sharpe, 3),
             "sortino": round(sortino, 3),
             "calmar": round(calmar, 3),
@@ -180,7 +194,7 @@ def kpis(symbol: str, timeframe: str) -> list[dict]:
     bt = backtest(symbol, timeframe)
     m = bt["metrics"]
     eq = bt["equity_curve"]
-    today_R = eq[-1]["value"] - eq[-2]["value"] if len(eq) > 1 else 0
+    today_R = m.get("today_profit_R", 0.0)
     spark = [e["value"] for e in eq[-30:]] if len(eq) >= 30 else [e["value"] for e in eq]
     last_proba = eq[-1]["proba"] if eq else 0.5
     p = m["win_rate"]
@@ -441,11 +455,22 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
     def _v(name):
         return float(last[name]) if name in last and pd.notna(last[name]) else 0.0
 
+    def _v_opt(name):
+        """Optional float — None when the column is absent or NaN.
+
+        Used for regime features (e.g. entropy) so a missing column is NOT
+        mistaken for a low reading (which would falsely flag a 'structured
+        market'). Required vs. _v which silently coerces missing → 0.0.
+        """
+        if name in last and pd.notna(last[name]):
+            return float(last[name])
+        return None
+
     rsi = _v(f"rsi_{tf}")
     atr = _v(f"atr_pct_{tf}")
     smc_bias = int(_v(f"smc_bias_{tf}"))
     at_zone = int(_v("at_zone"))
-    entropy = _v("entropy_20")
+    entropy = _v_opt("entropy_20")
     direction = "LONG" if last_proba >= 0.5 else "SHORT"
     accent_dir = "green" if last_proba >= 0.5 else "red"
 
@@ -468,7 +493,11 @@ def insights(symbol: str, timeframe: str) -> list[dict]:
     auc_tag = ("useful" if roc_auc >= 0.55 else "clear edge" if roc_auc >= 0.60 else "near-random")
 
     # ─── Regime (entropy self-filter) ──────────────────────────────
-    if entropy > 0.8:
+    if entropy is None:
+        regime_text = ("Entropy not available for this timeframe — "
+                       "regime filter skipped, standard sizing.")
+        regime_accent = "gray"
+    elif entropy > 0.8:
         regime_text = (f"Entropy {entropy:.2f} (>0.80) — high-noise regime. The model has little "
                        f"edge here; halve position size or stand aside.")
         regime_accent = "red"

@@ -345,7 +345,7 @@ function HeatmapSection() {
   return (
     <SectionCard
       title="Feature Correlation Heatmap"
-      description="Multicollinearity matrix · 17 features"
+      description={data ? `Multicollinearity matrix · ${data.labels.length} features` : "Multicollinearity matrix"}
       icon={<Grid3x3 className="h-4 w-4 text-warning" />}
       bodyClassName="p-2 sm:p-3"
     >
